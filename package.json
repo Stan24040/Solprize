@@ -1,0 +1,13 @@
+{
+  "name": "solprize-lottery",
+  "version": "1.0.0",
+  "description": "Solana lottery dApp",
+  "scripts": {
+    "build": "cd program && cargo build-bpf",
+    "test": "anchor test"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.87.0",
+    "@coral-xyz/anchor": "^0.29.0"
+  }
+}
