@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SOLPRIZE — Solana Lottery</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --teal:#00ffd5;--purple:#9b5de5;--pink:#f72585;--gold:#ffd60a;
+    --dark:#07070f;--card:#0e0e1c;--border:rgba(0,255,213,.13);
+    --glow:0 0 28px rgba(0,255,213,.28);
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--dark);color:#dde0ff;font-family:'Rajdhani',sans-serif;min-height:100vh;overflow-x:hidden}
+  .bg-fx{position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:radial-gradient(ellipse 70% 50% at 15% 10%,rgba(155,93,229,.2) 0%,transparent 55%),
+               radial-gradient(ellipse 55% 45% at 85% 85%,rgba(0,255,213,.13) 0%,transparent 55%),
+               radial-gradient(ellipse 40% 35% at 55% 50%,rgba(247,37,133,.09) 0%,transparent 55%)}
+  .grid-overlay{position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:linear-gradient(rgba(0,255,213,.03) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(0,255,213,.03) 1px,transparent 1px);
+    background-size:48px 48px}
+  .coin{position:fixed;z-index:0;pointer-events:none;border-radius:50%;
+    background:radial-gradient(circle at 35% 35%,var(--teal),#005f55);
+    box-shadow:0 0 10px rgba(0,255,213,.4);animation:floatCoin linear infinite;opacity:.25}
+  @keyframes floatCoin{0%{transform:translateY(110vh) rotate(0deg)}100%{transform:translateY(-10vh) rotate(720deg)}}
+
+  /* HEADER */
+  header{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;
+    padding:16px 32px;border-bottom:1px solid var(--border);
+    background:rgba(7,7,15,.9);backdrop-filter:blur(16px)}
+  .logo{font-family:'Orbitron',sans-serif;font-size:1.5rem;font-weight:900;
+    background:linear-gradient(90deg,var(--teal),var(--purple),var(--pink));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    letter-spacing:3px;animation:logoPulse 3s ease-in-out infinite;
+    filter:drop-shadow(0 0 8px rgba(0,255,213,.5))}
+  @keyframes logoPulse{0%,100%{filter:drop-shadow(0 0 6px rgba(0,255,213,.5))}50%{filter:drop-shadow(0 0 18px rgba(155,93,229,.8))}}
+  .wallet-area{display:flex;align-items:center;gap:12px}
+  .network-pill{background:rgba(0,255,213,.1);border:1px solid rgba(0,255,213,.25);
+    color:var(--teal);font-size:.7rem;letter-spacing:2px;font-weight:700;
+    padding:4px 10px;border-radius:20px;text-transform:uppercase}
+  .wallet-btn{display:flex;align-items:center;gap:8px;padding:9px 18px;border-radius:12px;
+    cursor:pointer;border:none;font-family:'Rajdhani',sans-serif;font-size:.9rem;font-weight:700;
+    letter-spacing:1px;text-transform:uppercase;transition:all .25s}
+  .wallet-btn.disconnected{background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;
+    box-shadow:0 4px 20px rgba(155,93,229,.4)}
+  .wallet-btn.disconnected:hover{transform:translateY(-1px);box-shadow:0 6px 28px rgba(155,93,229,.6)}
+  .wallet-btn.connected{background:rgba(0,255,213,.1);border:1px solid rgba(0,255,213,.3);color:var(--teal)}
+  .wallet-btn.connected:hover{background:rgba(0,255,213,.18)}
+  .wallet-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);
+    box-shadow:0 0 6px var(--teal);animation:dotBlink 2s ease-in-out infinite}
+  @keyframes dotBlink{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* WALLET MODAL */
+  .wmodal-bg{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;pointer-events:none;transition:opacity .3s}
+  .wmodal-bg.open{opacity:1;pointer-events:all}
+  .wmodal{background:var(--card);border:1px solid var(--border);border-radius:24px;
+    padding:36px 32px;max-width:380px;width:90%;text-align:center;
+    box-shadow:0 0 60px rgba(155,93,229,.25);
+    transform:translateY(20px) scale(.95);transition:transform .3s}
+  .wmodal-bg.open .wmodal{transform:translateY(0) scale(1)}
+  .wmodal-title{font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:900;
+    margin-bottom:8px;color:#fff;letter-spacing:2px}
+  .wmodal-sub{color:#666;font-size:.85rem;margin-bottom:28px}
+  .wallet-option{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:14px;
+    cursor:pointer;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);
+    margin-bottom:10px;transition:all .2s;text-align:left}
+  .wallet-option:hover{border-color:var(--teal);background:rgba(0,255,213,.07)}
+  .wallet-option-icon{font-size:1.6rem}
+  .wallet-option-name{font-size:1rem;font-weight:700}
+  .wallet-option-desc{font-size:.75rem;color:#666}
+  .wmodal-close{margin-top:16px;background:none;border:none;cursor:pointer;
+    color:#555;font-size:.85rem;font-family:'Rajdhani',sans-serif}
+  .wmodal-close:hover{color:#999}
+
+  /* WALLET INFO CARD */
+  .wallet-info-card{background:rgba(0,255,213,.06);border:1px solid rgba(0,255,213,.2);
+    border-radius:16px;padding:16px 24px;margin-bottom:24px;
+    display:none;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+  .wallet-info-card.visible{display:flex}
+  .wallet-info-label{font-size:.7rem;letter-spacing:2px;color:#555;text-transform:uppercase}
+  .wallet-info-value{font-family:'Orbitron',sans-serif;font-size:.9rem;font-weight:700;color:var(--teal)}
+  .wallet-addr{font-size:.75rem;color:#888;font-family:monospace}
+  .disconnect-btn{background:rgba(247,37,133,.15);border:1px solid rgba(247,37,133,.3);
+    color:var(--pink);border-radius:8px;padding:6px 14px;cursor:pointer;
+    font-family:'Rajdhani',sans-serif;font-size:.8rem;font-weight:700}
+
+  /* CONNECT GATE */
+  .connect-gate{background:rgba(155,93,229,.08);border:1px dashed rgba(155,93,229,.3);
+    border-radius:16px;padding:28px;text-align:center;margin-bottom:24px}
+  .connect-gate p{color:#666;font-size:.95rem;margin-bottom:14px}
+  .gate-btn{padding:12px 28px;border-radius:10px;border:none;cursor:pointer;
+    background:linear-gradient(135deg,var(--purple),var(--pink));
+    color:#fff;font-family:'Orbitron',sans-serif;font-size:.8rem;font-weight:900;letter-spacing:1px;
+    box-shadow:0 4px 20px rgba(155,93,229,.4);transition:all .2s}
+  .gate-btn:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(155,93,229,.6)}
+
+  /* TX STATUS */
+  .tx-status{border-radius:12px;padding:12px 18px;margin-bottom:16px;
+    font-size:.9rem;font-weight:600;display:none;align-items:center;gap:10px;border:1px solid}
+  .tx-status.pending{background:rgba(255,214,10,.07);border-color:rgba(255,214,10,.25);color:var(--gold);display:flex}
+  .tx-status.success{background:rgba(0,255,213,.07);border-color:rgba(0,255,213,.25);color:var(--teal);display:flex}
+  .tx-status.error{background:rgba(247,37,133,.07);border-color:rgba(247,37,133,.25);color:var(--pink);display:flex}
+  .tx-spin{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,214,10,.3);
+    border-top-color:var(--gold);animation:spin .8s linear infinite;flex-shrink:0}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  main{position:relative;z-index:5;max-width:900px;margin:0 auto;padding:28px 20px 64px}
+
+  /* JACKPOT */
+  .jackpot-hero{text-align:center;padding:40px 20px 28px}
+  .jackpot-label{font-family:'Orbitron',sans-serif;font-size:.72rem;letter-spacing:5px;
+    color:var(--teal);text-transform:uppercase;margin-bottom:8px}
+  .jackpot-amount{font-family:'Orbitron',sans-serif;font-size:clamp(2.8rem,10vw,5.5rem);font-weight:900;
+    background:linear-gradient(135deg,var(--gold),#ff9f1c,var(--gold));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    animation:jackpotGlow 2.5s ease-in-out infinite;line-height:1.1}
+  @keyframes jackpotGlow{0%,100%{filter:drop-shadow(0 0 18px rgba(255,214,10,.35))}50%{filter:drop-shadow(0 0 48px rgba(255,214,10,.75))}}
+  .jackpot-sol{font-size:.45em;color:var(--teal)}
+
+  /* STATS */
+  .stats-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:20px 0 28px}
+  .stat-pill{background:var(--card);border:1px solid var(--border);border-radius:40px;
+    padding:9px 20px;display:flex;align-items:center;gap:8px;
+    font-size:.95rem;font-weight:600;box-shadow:var(--glow)}
+  .stat-pill .val{color:var(--teal);font-weight:700}
+
+  /* COUNTDOWN */
+  .countdown-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:32px}
+  .countdown-label{font-size:.7rem;letter-spacing:3px;color:#555;text-transform:uppercase}
+  .countdown-timer{font-family:'Orbitron',sans-serif;font-size:2.2rem;font-weight:900;
+    color:var(--pink);text-shadow:0 0 20px rgba(247,37,133,.6)}
+  .cbar-bg{width:240px;height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden}
+  .cbar{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--pink),var(--purple));
+    box-shadow:0 0 8px rgba(247,37,133,.5);transition:width 1s linear}
+
+  /* BUY PANEL */
+  .buy-panel{background:var(--card);border:1px solid var(--border);border-radius:20px;
+    padding:28px;margin-bottom:24px;box-shadow:var(--glow);position:relative;overflow:hidden}
+  .buy-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,var(--teal),var(--purple),var(--pink))}
+  .buy-title{font-family:'Orbitron',sans-serif;font-size:.9rem;letter-spacing:2px;
+    color:var(--teal);margin-bottom:18px;text-transform:uppercase}
+  .ticket-controls{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+  .ticket-input-wrap{display:flex;align-items:center;background:rgba(255,255,255,.05);
+    border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .tick-btn{width:42px;height:42px;background:none;border:none;color:var(--teal);
+    font-size:1.3rem;cursor:pointer;transition:background .2s;
+    display:flex;align-items:center;justify-content:center}
+  .tick-btn:hover{background:rgba(0,255,213,.1)}
+  .ticket-input{width:60px;text-align:center;background:none;border:none;outline:none;
+    color:#fff;font-size:1.2rem;font-family:'Orbitron',sans-serif;font-weight:700}
+  .quick-btns{display:flex;gap:7px;flex-wrap:wrap}
+  .quick-btn{padding:7px 14px;border-radius:8px;background:rgba(155,93,229,.12);
+    border:1px solid rgba(155,93,229,.25);color:#aaa;font-size:.82rem;
+    font-family:'Rajdhani',sans-serif;font-weight:700;cursor:pointer;transition:all .2s}
+  .quick-btn:hover{background:rgba(155,93,229,.3);color:#fff;border-color:var(--purple)}
+  .cost-display{background:rgba(0,255,213,.05);border:1px solid rgba(0,255,213,.18);
+    border-radius:12px;padding:12px 18px;margin-bottom:18px;
+    display:flex;justify-content:space-between;align-items:center}
+  .cost-label{font-size:.85rem;color:#777}
+  .cost-value{font-family:'Orbitron',sans-serif;font-size:1rem;font-weight:700;color:var(--teal)}
+  .odds-hint{font-size:.75rem;color:#555;margin-top:3px}
+  .buy-btn{width:100%;padding:15px;border-radius:14px;border:none;cursor:pointer;
+    font-family:'Orbitron',sans-serif;font-size:.95rem;font-weight:900;
+    letter-spacing:2px;text-transform:uppercase;
+    background:linear-gradient(135deg,var(--teal) 0%,var(--purple) 100%);
+    color:#07070f;box-shadow:0 4px 24px rgba(0,255,213,.3);transition:all .25s}
+  .buy-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 36px rgba(0,255,213,.5)}
+  .buy-btn:disabled{opacity:.5;cursor:not-allowed}
+
+  /* ODDS */
+  .odds-panel{background:var(--card);border:1px solid var(--border);
+    border-radius:16px;padding:18px 22px;margin-bottom:24px}
+  .odds-title{font-size:.7rem;letter-spacing:3px;color:#555;text-transform:uppercase;margin-bottom:10px}
+  .obar-bg{height:10px;border-radius:5px;background:rgba(255,255,255,.06);margin-bottom:7px;overflow:hidden}
+  .obar{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--purple),var(--teal));
+    transition:width .6s ease;box-shadow:0 0 8px rgba(0,255,213,.35)}
+  .odds-pct{font-size:.9rem;font-weight:700;color:var(--teal)}
+
+  /* TABS */
+  .tabs{display:flex;gap:0;border-radius:12px 12px 0 0;overflow:hidden}
+  .tab-btn{flex:1;padding:11px;background:rgba(255,255,255,.03);
+    border:1px solid var(--border);border-bottom:none;color:#555;
+    font-family:'Rajdhani',sans-serif;font-size:.9rem;font-weight:700;
+    letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+  .tab-btn.active{background:var(--card);color:var(--teal)}
+  .tab-panel{background:var(--card);border:1px solid var(--border);
+    border-radius:0 0 16px 16px;padding:22px;display:none}
+  .tab-panel.active{display:block}
+  .winner-row{display:flex;align-items:center;gap:12px;padding:11px 0;
+    border-bottom:1px solid rgba(255,255,255,.04);animation:fadeIn .4s ease}
+  .winner-row:last-child{border-bottom:none}
+  @keyframes fadeIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+  .winner-trophy{font-size:1.3rem}
+  .winner-name{font-weight:700;flex:1;font-size:.95rem}
+  .winner-sub{font-size:.72rem;color:#555}
+  .winner-amt{font-family:'Orbitron',sans-serif;font-size:.9rem;font-weight:700;color:var(--gold)}
+  .player-row{display:flex;align-items:center;gap:10px;padding:9px 0;
+    border-bottom:1px solid rgba(255,255,255,.03)}
+  .player-row:last-child{border-bottom:none}
+  .pdot{width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 5px var(--teal)}
+  .pname{flex:1;font-size:.88rem}
+  .ptix{font-size:.78rem;color:var(--purple);font-weight:700}
+  .step{display:flex;gap:14px;align-items:flex-start;background:rgba(255,255,255,.02);
+    border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,.05);margin-bottom:12px}
+  .step:last-child{margin-bottom:0}
+  .step-num{width:30px;height:30px;border-radius:50%;flex-shrink:0;
+    background:linear-gradient(135deg,var(--purple),var(--pink));
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Orbitron',sans-serif;font-size:.7rem;font-weight:900;color:#fff}
+  .step-text{font-size:.9rem;line-height:1.5;color:#aaa}
+  .step-text strong{color:var(--teal)}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(100px);
+    background:var(--card);border:1px solid var(--teal);border-radius:12px;padding:12px 26px;
+    font-size:.95rem;font-weight:600;box-shadow:var(--glow);z-index:999;
+    transition:transform .4s cubic-bezier(.34,1.56,.64,1);color:var(--teal);
+    text-align:center;pointer-events:none}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+
+  /* DRAW MODAL */
+  .modal-bg{position:fixed;inset:0;z-index:150;background:rgba(0,0,0,.88);backdrop-filter:blur(10px);
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;pointer-events:none;transition:opacity .3s}
+  .modal-bg.open{opacity:1;pointer-events:all}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:24px;
+    padding:44px 36px;max-width:400px;width:90%;text-align:center;
+    box-shadow:0 0 60px rgba(0,255,213,.18);
+    transform:scale(.85);transition:transform .3s}
+  .modal-bg.open .modal{transform:scale(1)}
+  .modal-emoji{font-size:3.5rem;margin-bottom:14px;display:block;animation:popIn .6s ease}
+  @keyframes popIn{0%{transform:scale(0)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
+  .modal-title{font-family:'Orbitron',sans-serif;font-size:1.4rem;font-weight:900;margin-bottom:10px;
+    background:linear-gradient(90deg,var(--gold),var(--pink));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .modal-body{color:#999;font-size:.95rem;line-height:1.6;margin-bottom:22px}
+  .modal-close{padding:11px 34px;border-radius:10px;border:none;cursor:pointer;
+    background:linear-gradient(135deg,var(--teal),var(--purple));
+    color:#07070f;font-family:'Orbitron',sans-serif;font-weight:900;font-size:.82rem;letter-spacing:1px}
+  .tx-link{color:var(--teal);text-decoration:underline;font-size:.8rem;display:block;margin-top:8px}
+  footer{text-align:center;padding:18px;color:#2a2a40;font-size:.72rem;position:relative;z-index:5}
+</style>
+</head>
+<body>
+<div class="bg-fx"></div>
+<div class="grid-overlay"></div>
+<script>
+  for(let i=0;i<10;i++){
+    const c=document.createElement('div');c.className='coin';
+    const sz=10+Math.random()*18;
+    c.style.cssText=`left:${Math.random()*100}vw;width:${sz}px;height:${sz}px;animation-duration:${14+Math.random()*20}s;animation-delay:${-Math.random()*34}s`;
+    document.body.appendChild(c);
+  }
+</script>
+
+<header>
+  <div class="logo">◎ SOLPRIZE</div>
+  <div class="wallet-area">
+    <div class="network-pill">Devnet</div>
+    <button class="wallet-btn disconnected" id="wallet-btn" onclick="openWalletModal()">🔗 Connect Wallet</button>
+  </div>
+</header>
+
+<!-- WALLET MODAL -->
+<div class="wmodal-bg" id="wmodal-bg">
+  <div class="wmodal">
+    <div class="wmodal-title">CONNECT WALLET</div>
+    <div class="wmodal-sub">Choose your Solana wallet to play</div>
+    <div class="wallet-option" onclick="connectPhantom()">
+      <span class="wallet-option-icon">👻</span>
+      <div><div class="wallet-option-name">Phantom</div><div class="wallet-option-desc">Most popular Solana wallet</div></div>
+    </div>
+    <div class="wallet-option" onclick="connectSolflare()">
+      <span class="wallet-option-icon">🌟</span>
+      <div><div class="wallet-option-name">Solflare</div><div class="wallet-option-desc">Feature-rich Solana wallet</div></div>
+    </div>
+    <div class="wallet-option" onclick="connectDemo()">
+      <span class="wallet-option-icon">🎮</span>
+      <div><div class="wallet-option-name">Demo Mode</div><div class="wallet-option-desc">Play without a real wallet</div></div>
+    </div>
+    <button class="wmodal-close" onclick="closeWalletModal()">✕ Cancel</button>
+  </div>
+</div>
+
+<main>
+  <div class="jackpot-hero">
+    <div class="jackpot-label">🏆 Current Jackpot</div>
+    <div class="jackpot-amount"><span id="jackpot-val">3.76</span><span class="jackpot-sol"> SOL</span></div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-pill">🎟️ Tickets: <span class="val" id="total-tickets">376</span></div>
+    <div class="stat-pill">👥 Players: <span class="val" id="total-players">24</span></div>
+    <div class="stat-pill">💎 0.01 SOL / ticket</div>
+  </div>
+
+  <div class="countdown-wrap">
+    <div class="countdown-label">⏳ Next Draw In</div>
+    <div class="countdown-timer" id="countdown">10:00</div>
+    <div class="cbar-bg"><div class="cbar" id="cbar" style="width:100%"></div></div>
+  </div>
+
+  <!-- Wallet info (visible when connected) -->
+  <div class="wallet-info-card" id="wallet-info-card">
+    <div>
+      <div class="wallet-info-label">Wallet</div>
+      <div class="wallet-addr" id="wallet-addr-short">—</div>
+    </div>
+    <div>
+      <div class="wallet-info-label">Balance</div>
+      <div class="wallet-info-value" id="wallet-balance">0.00 SOL</div>
+    </div>
+    <div>
+      <div class="wallet-info-label">My Tickets</div>
+      <div class="wallet-info-value" id="my-tickets-display">0</div>
+    </div>
+    <button class="disconnect-btn" onclick="disconnectWallet()">Disconnect</button>
+  </div>
+
+  <!-- TX status bar -->
+  <div class="tx-status" id="tx-status">
+    <div class="tx-spin" id="tx-spin"></div>
+    <span id="tx-msg">Processing...</span>
+  </div>
+
+  <!-- Buy Panel -->
+  <div class="buy-panel">
+    <div class="buy-title">🎟️ Buy Tickets</div>
+    <div class="connect-gate" id="connect-gate">
+      <p>Connect your Solana wallet to buy tickets and enter the draw</p>
+      <button class="gate-btn" onclick="openWalletModal()">🔗 Connect Wallet to Play</button>
+    </div>
+    <div id="buy-form" style="display:none">
+      <div class="ticket-controls">
+        <div class="ticket-input-wrap">
+          <button class="tick-btn" onclick="adjustTickets(-1)">−</button>
+          <input class="ticket-input" id="ticket-count" type="number" value="1" min="1" max="100" oninput="updateCost()"/>
+          <button class="tick-btn" onclick="adjustTickets(1)">+</button>
+        </div>
+        <div class="quick-btns">
+          <button class="quick-btn" onclick="setTickets(5)">×5</button>
+          <button class="quick-btn" onclick="setTickets(10)">×10</button>
+          <button class="quick-btn" onclick="setTickets(25)">×25</button>
+          <button class="quick-btn" onclick="setTickets(50)">×50</button>
+        </div>
+      </div>
+      <div class="cost-display">
+        <div>
+          <div class="cost-label">Total Cost</div>
+          <div class="odds-hint" id="odds-hint">~0.27% odds with 1 ticket</div>
+        </div>
+        <div class="cost-value" id="cost-val">0.010 SOL</div>
+      </div>
+      <button class="buy-btn" id="buy-btn" onclick="buyTickets()">⚡ BUY TICKETS</button>
+    </div>
+  </div>
+
+  <!-- Odds panel -->
+  <div class="odds-panel">
+    <div class="odds-title">📊 Win Probability</div>
+    <div class="obar-bg"><div class="obar" id="obar" style="width:.3%"></div></div>
+    <div class="odds-pct" id="odds-pct">Connect wallet to see your odds</div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('winners',this)">🏆 Winners</button>
+    <button class="tab-btn" onclick="showTab('players',this)">👥 Players</button>
+    <button class="tab-btn" onclick="showTab('how',this)">ℹ️ How It Works</button>
+  </div>
+  <div class="tab-panel active" id="tab-winners"><div id="winners-list"></div></div>
+  <div class="tab-panel" id="tab-players"><div id="players-list"></div></div>
+  <div class="tab-panel" id="tab-how">
+    <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Connect Wallet</strong> — Use Phantom or Solflare (Devnet). Or try Demo Mode.</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Buy Tickets</strong> — Each ticket is <strong>0.01 SOL</strong>. Sign the transaction from your wallet. More tickets = better odds.</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Wait for the Draw</strong> — Every 10 minutes a draw occurs. The jackpot = all ticket sales.</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text"><strong>Win the Jackpot</strong> — One random weighted ticket wins the entire pot. SOL sent directly to your wallet.</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text"><strong>Provably Fair</strong> — All draws use <strong>on-chain VRF</strong>. Verify every result on Solscan.</div></div>
+  </div>
+</main>
+
+<footer>◎ SOLPRIZE — Devnet Demo — Not a real gambling product — Educational purposes only</footer>
+
+<!-- Draw Modal -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <span class="modal-emoji" id="modal-emoji">🏆</span>
+    <div class="modal-title" id="modal-title">DRAW COMPLETE!</div>
+    <div class="modal-body" id="modal-body">...</div>
+    <a class="tx-link" id="modal-tx" href="#" target="_blank" style="display:none">View on Solscan ↗</a>
+    <br/><br/>
+    <button class="modal-close" onclick="closeModal()">CONTINUE</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════
+   WALLET STATE
+══════════════════════════════════════════ */
+const TREASURY = 'EEKbpDmcGsSu5qqMrafgcSFaLwctcW6s9fDwydDGy21J';
+const TICKET_PRICE = 0.01;
+const LAMPORTS = 1_000_000_000;
+
+let wallet = { connected:false, pubkey:null, balance:0, provider:null, isDemo:false };
+
+function openWalletModal()  { document.getElementById('wmodal-bg').classList.add('open'); }
+function closeWalletModal() { document.getElementById('wmodal-bg').classList.remove('open'); }
+
+async function connectPhantom() {
+  closeWalletModal();
+  const p = window.phantom?.solana || window.solana;
+  if (!p?.isPhantom) {
+    showToast('👻 Phantom not found — redirecting to phantom.app');
+    setTimeout(() => window.open('https://phantom.app','_blank'), 1200);
+    return;
+  }
+  try {
+    setTx('pending','👻 Connecting Phantom...');
+    const r = await p.connect();
+    wallet.provider = p; wallet.pubkey = r.publicKey.toString(); wallet.isDemo = false;
+    await fetchBalance();
+    onConnected(); clearTx();
+  } catch(e) { setTx('error','✕ '+(e.message||'Cancelled')); setTimeout(clearTx,3000); }
+}
+
+async function connectSolflare() {
+  closeWalletModal();
+  const p = window.solflare;
+  if (!p) {
+    showToast('🌟 Solflare not found — redirecting to solflare.com');
+    setTimeout(() => window.open('https://solflare.com','_blank'), 1200);
+    return;
+  }
+  try {
+    setTx('pending','🌟 Connecting Solflare...');
+    await p.connect();
+    wallet.provider = p; wallet.pubkey = p.publicKey.toString(); wallet.isDemo = false;
+    await fetchBalance();
+    onConnected(); clearTx();
+  } catch(e) { setTx('error','✕ '+(e.message||'Cancelled')); setTimeout(clearTx,3000); }
+}
+
+function connectDemo() {
+  closeWalletModal();
+  wallet = { connected:true, pubkey:'DEMO'+Math.random().toString(36).slice(2,8).toUpperCase(), balance:10.5, provider:null, isDemo:true };
+  onConnected();
+}
+
+async function fetchBalance() {
+  try {
+    const r = await fetch('https://api.devnet.solana.com',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({jsonrpc:'2.0',id:1,method:'getBalance',params:[wallet.pubkey,{commitment:'confirmed'}]})
+    });
+    const d = await r.json();
+    wallet.balance = (d.result?.value||0)/LAMPORTS;
+  } catch { wallet.balance = 0; }
+}
+
+function onConnected() {
+  wallet.connected = true;
+  updateWalletUI();
+  showToast('✅ Wallet connected!');
+}
+
+function disconnectWallet() {
+  if (wallet.provider && !wallet.isDemo) { try{ wallet.provider.disconnect(); }catch(e){} }
+  wallet = { connected:false, pubkey:null, balance:0, provider:null, isDemo:false };
+  myTickets = 0;
+  updateWalletUI();
+  updateOdds(0, totalTickets);
+  showToast('👋 Disconnected');
+}
+
+function updateWalletUI() {
+  const btn  = document.getElementById('wallet-btn');
+  const card = document.getElementById('wallet-info-card');
+  const gate = document.getElementById('connect-gate');
+  const form = document.getElementById('buy-form');
+  if (wallet.connected) {
+    btn.className = 'wallet-btn connected';
+    btn.innerHTML = `<div class="wallet-dot"></div>${shortAddr(wallet.pubkey)}`;
+    btn.onclick = null;
+    card.classList.add('visible');
+    document.getElementById('wallet-addr-short').textContent = wallet.isDemo ? '🎮 Demo Mode' : shortAddr(wallet.pubkey);
+    document.getElementById('wallet-balance').textContent = wallet.balance.toFixed(4)+' SOL';
+    document.getElementById('my-tickets-display').textContent = myTickets;
+    gate.style.display = 'none';
+    form.style.display = 'block';
+    updateCost(); updateOdds(myTickets, totalTickets);
+  } else {
+    btn.className = 'wallet-btn disconnected';
+    btn.innerHTML = '🔗 Connect Wallet';
+    btn.onclick = openWalletModal;
+    card.classList.remove('visible');
+    gate.style.display = 'block';
+    form.style.display = 'none';
+  }
+}
+
+function shortAddr(a) { return !a||a.startsWith('DEMO') ? a : a.slice(0,4)+'...'+a.slice(-4); }
+
+/* ══════════════════════════════════════════
+   TRANSACTIONS
+══════════════════════════════════════════ */
+function setTx(type, msg) {
+  const el = document.getElementById('tx-status');
+  el.className = 'tx-status '+type;
+  document.getElementById('tx-msg').textContent = msg;
+  document.getElementById('tx-spin').style.display = type==='pending'?'block':'none';
+}
+function clearTx() { document.getElementById('tx-status').className='tx-status'; }
+
+async function buyTickets() {
+  if (!wallet.connected) { openWalletModal(); return; }
+  const n = parseInt(document.getElementById('ticket-count').value)||1;
+  const cost = n * TICKET_PRICE;
+  if (!wallet.isDemo && wallet.balance < cost) {
+    setTx('error',`✕ Need ${cost.toFixed(3)} SOL, you have ${wallet.balance.toFixed(4)} SOL`);
+    setTimeout(clearTx,4000); return;
+  }
+  const btn = document.getElementById('buy-btn');
+  btn.disabled = true; btn.textContent = '⏳ Processing...';
+  if (wallet.isDemo) {
+    setTx('pending',`⏳ Simulating ${n} ticket purchase...`);
+    await sleep(1600);
+    setTx('success',`✅ ${n} ticket${n>1?'s':''} purchased! (Demo)`);
+    finishPurchase(n, cost, 'DEMO_'+Date.now());
+  } else {
+    await sendTx(n, cost);
+  }
+  btn.disabled = false; btn.textContent = '⚡ BUY TICKETS';
+  setTimeout(clearTx, 5000);
+}
+
+async function sendTx(n, cost) {
+  try {
+    if (!window.solanaWeb3) throw new Error('Solana library not loaded yet. Please try again.');
+    setTx('pending','📡 Preparing transaction...');
+    const { Connection, PublicKey, Transaction, SystemProgram } = solanaWeb3;
+    const conn = new Connection('https://api.devnet.solana.com','confirmed');
+    const from = new PublicKey(wallet.pubkey);
+    const to   = new PublicKey(TREASURY);
+    const lamps = Math.round(cost * LAMPORTS);
+    const { blockhash } = await conn.getLatestBlockhash();
+    const tx = new Transaction({ recentBlockhash:blockhash, feePayer:from });
+    tx.add(SystemProgram.transfer({ fromPubkey:from, toPubkey:to, lamports:lamps }));
+    setTx('pending','✍️ Sign in your wallet...');
+    const signed = await wallet.provider.signTransaction(tx);
+    setTx('pending','📡 Sending to network...');
+    const sig = await conn.sendRawTransaction(signed.serialize());
+    setTx('pending','⏳ Confirming on-chain...');
+    await conn.confirmTransaction(sig,'confirmed');
+    setTx('success',`✅ Confirmed! ${sig.slice(0,8)}...`);
+    wallet.balance -= (cost + 0.000005);
+    finishPurchase(n, cost, sig);
+  } catch(e) {
+    const m = e.message||'';
+    setTx('error','✕ '+(m.includes('rejected')||m.includes('User')?'Transaction rejected':m||'Transaction failed'));
+  }
+}
+
+function finishPurchase(n, cost, sig) {
+  myTickets += n; totalTickets += n;
+  jackpot = parseFloat((jackpot + cost).toFixed(4));
+  const me = wallet.isDemo ? 'You (Demo) ⭐' : shortAddr(wallet.pubkey)+' ⭐';
+  const ex = participants.find(p=>p.name===me);
+  ex ? (ex.tickets+=n) : participants.push({name:me,tickets:n});
+  document.getElementById('jackpot-val').textContent = jackpot.toFixed(2);
+  document.getElementById('total-tickets').textContent = totalTickets;
+  document.getElementById('total-players').textContent = participants.length;
+  document.getElementById('my-tickets-display').textContent = myTickets;
+  document.getElementById('wallet-balance').textContent = wallet.balance.toFixed(4)+' SOL';
+  updateOdds(myTickets, totalTickets);
+  renderPlayers();
+  showToast(`🎟️ ${n} ticket${n>1?'s':''} bought — ${myTickets} total. Good luck!`);
+}
+
+/* ══════════════════════════════════════════
+   GAME STATE + UI
+══════════════════════════════════════════ */
+let jackpot=3.76, totalTickets=376, myTickets=0, totalSeconds=600, elapsed=0;
+let participants=[
+  {name:'crypto_wolf',tickets:42},{name:'solana_king',tickets:28},
+  {name:'moon_chaser',tickets:15},{name:'defi_degen',tickets:50},
+  {name:'hodlmaster',tickets:12},{name:'blockchainbob',tickets:8},
+  {name:'gem_hunter',tickets:33},{name:'rugged_anon',tickets:63},
+];
+const pastWinners=[
+  {name:'Legitjake',      amount:4.72, tickets:3,  date:'Feb 6',  sig:'3xK9p...mRz2'},
+  {name:'Lostmyseedhelp',amount:3.71, tickets:11, date:'Jan 31', sig:'7yQ2a...nBx1'},
+  {name:'jasonsmith8',   amount:3.36, tickets:9,  date:'Jan 31', sig:'9pL3c...vWy8'},
+  {name:'hashinity',     amount:4.17, tickets:3,  date:'Jan 25', sig:'2mT5e...kRz4'},
+  {name:'memetr4der',    amount:32.22,tickets:4,  date:'Jan 19', sig:'5qN8d...jXp7'},
+];
+
+function updateCost() {
+  const n=parseInt(document.getElementById('ticket-count').value)||1;
+  document.getElementById('cost-val').textContent=(n*TICKET_PRICE).toFixed(3)+' SOL';
+  const pct=totalTickets>0?((myTickets+n)/(totalTickets+n)*100):0;
+  document.getElementById('odds-hint').textContent=`~${pct.toFixed(2)}% odds with ${myTickets+n} total tickets`;
+  updateOdds(myTickets+n, totalTickets+n);
+}
+function adjustTickets(d) {
+  const el=document.getElementById('ticket-count');
+  el.value=Math.max(1,Math.min(100,(parseInt(el.value)||1)+d)); updateCost();
+}
+function setTickets(n) { document.getElementById('ticket-count').value=n; updateCost(); }
+function updateOdds(mine, total) {
+  const pct=total>0?Math.min(99.9,mine/total*100):0;
+  document.getElementById('obar').style.width=Math.max(pct,.1)+'%';
+  document.getElementById('odds-pct').textContent=wallet.connected
+    ?`${pct.toFixed(2)}% — ${mine} of ${total} tickets`
+    :'Connect wallet to see your odds';
+}
+function renderWinners() {
+  const icons=['🥇','🥈','🥉','🏅','🏅'];
+  document.getElementById('winners-list').innerHTML=pastWinners.map((w,i)=>`
+    <div class="winner-row">
+      <span class="winner-trophy">${icons[i]||'🏅'}</span>
+      <div><div class="winner-name">${w.name}</div>
+      <div class="winner-sub">${w.tickets} tickets · ${w.date} · ${w.sig}</div></div>
+      <div class="winner-amt">+${w.amount.toFixed(2)} SOL</div>
+    </div>`).join('');
+}
+function renderPlayers() {
+  document.getElementById('players-list').innerHTML=
+    [...participants].sort((a,b)=>b.tickets-a.tickets)
+    .map(p=>`<div class="player-row"><div class="pdot"></div><div class="pname">${p.name}</div><div class="ptix">${p.tickets} 🎟️</div></div>`)
+    .join('');
+}
+function showTab(id,btn) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+}
+let toastTimer;
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),3200);
+}
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+
+/* ══════════════════════════════════════════
+   COUNTDOWN
+══════════════════════════════════════════ */
+function fmt(s){ return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+setInterval(()=>{
+  elapsed++;
+  const rem=totalSeconds-(elapsed%totalSeconds);
+  document.getElementById('countdown').textContent=fmt(rem);
+  document.getElementById('cbar').style.width=(rem/totalSeconds*100)+'%';
+  if(Math.random()<.06){
+    const add=Math.floor(Math.random()*3)+1;
+    totalTickets+=add; jackpot=parseFloat((jackpot+TICKET_PRICE*add).toFixed(4));
+    document.getElementById('jackpot-val').textContent=jackpot.toFixed(2);
+    document.getElementById('total-tickets').textContent=totalTickets;
+    if(wallet.connected) updateOdds(myTickets,totalTickets);
+  }
+  if(rem===0) runDraw();
+},1000);
+
+function runDraw() {
+  const pool=[];
+  participants.forEach(p=>{for(let i=0;i<p.tickets;i++) pool.push(p.name);});
+  if(!pool.length) return;
+  const winner=pool[Math.floor(Math.random()*pool.length)];
+  const amt=jackpot.toFixed(2);
+  const sig=Array.from({length:8},()=>'23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'[Math.floor(Math.random()*58)]).join('')+'...';
+  pastWinners.unshift({name:winner,amount:parseFloat(amt),tickets:participants.find(p=>p.name===winner)?.tickets||1,date:'Just now',sig});
+  if(pastWinners.length>10) pastWinners.pop();
+  renderWinners();
+  const isMe=winner.includes('⭐');
+  document.getElementById('modal-emoji').textContent=isMe?'🎉':'🏆';
+  document.getElementById('modal-title').textContent=isMe?'YOU WON! 🎉':'DRAW COMPLETE!';
+  document.getElementById('modal-body').innerHTML=isMe
+    ?`<strong style="color:var(--gold);font-size:1.3rem">${amt} SOL</strong> sent to your wallet!<br><br>You had ${myTickets} of ${totalTickets} tickets 🎊`
+    :`<strong style="color:var(--teal)">${winner}</strong> won <strong style="color:var(--gold)">${amt} SOL</strong>!<br><br>Better luck next time! 🍀`;
+  const tl=document.getElementById('modal-tx');
+  tl.href=`https://solscan.io/tx/${sig}?cluster=devnet`; tl.style.display='block';
+  document.getElementById('modal-bg').classList.add('open');
+  jackpot=0; totalTickets=0; myTickets=0; participants=[];
+  ['jackpot-val','total-tickets','total-players','my-tickets-display'].forEach((id,i)=>{
+    document.getElementById(id).textContent=i===0?'0.00':'0';
+  });
+  updateOdds(0,0); renderPlayers();
+}
+
+function closeModal() {
+  document.getElementById('modal-bg').classList.remove('open');
+  jackpot=parseFloat((Math.random()*2+0.5).toFixed(2));
+  ['shadow_dex','block_rider','sol_sniper','yield_monk','ape_mode','punk_flipper','lambo_soon','dark_matter']
+    .forEach(n=>participants.push({name:n,tickets:Math.floor(Math.random()*30)+2}));
+  totalTickets=participants.reduce((s,p)=>s+p.tickets,0);
+  document.getElementById('jackpot-val').textContent=jackpot.toFixed(2);
+  document.getElementById('total-tickets').textContent=totalTickets;
+  document.getElementById('total-players').textContent=participants.length;
+  renderPlayers();
+  if(wallet.connected) updateOdds(myTickets,totalTickets);
+}
+
+// ── INIT
+renderWinners(); renderPlayers(); updateWalletUI();
+
+// ── Load solana-web3.js async
+(()=>{
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/solana-web3.js/1.73.0/solana-web3.min.js';
+  s.onload=()=>{ window.solanaWeb3=solanaWeb3; };
+  document.head.appendChild(s);
+  // Auto-reconnect
+  window.addEventListener('load',async()=>{
+    const p=window.phantom?.solana||window.solana;
+    if(p?.isPhantom&&p.isConnected){
+      wallet.provider=p; wallet.pubkey=p.publicKey.toString(); wallet.isDemo=false;
+      await fetchBalance(); onConnected();
+    }
+  });
+})();
+</script>
+</body>
+</html>
